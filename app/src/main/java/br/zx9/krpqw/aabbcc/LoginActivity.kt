@@ -1,4 +1,4 @@
-package com.aauto.youtube
+package br.zx9.krpqw.aabbcc
 
 import android.annotation.SuppressLint
 import android.app.Activity
@@ -36,8 +36,6 @@ class LoginActivity : Activity() {
                 request: WebResourceRequest
             ): Boolean {
                 val url = request.url.toString()
-
-                // detecta quando login foi concluído
                 if (url.contains("youtube.com") && !url.contains("accounts.google.com")) {
                     cookieManager.flush()
                     val prefs = getSharedPreferences("aauto", MODE_PRIVATE)

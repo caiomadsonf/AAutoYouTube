@@ -3,11 +3,11 @@ plugins {
 }
 
 android {
-    namespace = "com.aauto.youtube"
+    namespace = "br.zx9.krpqw.aabbcc"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.aauto.youtube"
+        applicationId = "br.zx9.krpqw.aabbcc"
         minSdk = 26
         targetSdk = 36
         versionCode = 1

@@ -1,4 +1,4 @@
-package com.aauto.youtube
+package br.zx9.krpqw.aabbcc
 
 import android.annotation.SuppressLint
 import android.app.Activity
@@ -18,7 +18,6 @@ class WebViewActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // verifica se já está logado
         val prefs = getSharedPreferences("aauto", MODE_PRIVATE)
         val loggedIn = prefs.getBoolean("logged_in", false)
 
