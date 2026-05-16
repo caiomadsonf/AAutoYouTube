@@ -37,6 +37,16 @@
             android:name=".LoginActivity"
             android:exported="false" />
 
+        <activity
+            android:name=".ShareFromYouTubeActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
+
         <service
             android:name=".CarService"
             android:exported="true">
