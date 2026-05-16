@@ -1,5 +1,6 @@
 package br.zx9.krpqw.aabbcc
 
+import android.content.Intent
 import android.media.MediaPlayer
 import android.os.Bundle
 import android.support.v4.media.MediaBrowserCompat
@@ -16,23 +17,65 @@ class MusicService : MediaBrowserServiceCompat() {
         super.onCreate()
 
         mediaSession = MediaSessionCompat(this, "AAutoYouTube")
+
+        mediaSession.setCallback(object : MediaSessionCompat.Callback() {
+
+            override fun onPlay() {
+                sendCommandToWebView("play")
+                setPlaybackState(PlaybackStateCompat.STATE_PLAYING)
+            }
+
+            override fun onPause() {
+                sendCommandToWebView("pause")
+                setPlaybackState(PlaybackStateCompat.STATE_PAUSED)
+            }
+
+            override fun onSkipToNext() {
+                sendCommandToWebView("next")
+            }
+
+            override fun onSkipToPrevious() {
+                sendCommandToWebView("previous")
+            }
+
+            override fun onStop() {
+                sendCommandToWebView("pause")
+                setPlaybackState(PlaybackStateCompat.STATE_STOPPED)
+            }
+        })
+
         mediaSession.setFlags(
             MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS or
                     MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS
         )
 
-        val state = PlaybackStateCompat.Builder()
-            .setActions(PlaybackStateCompat.ACTION_PLAY or PlaybackStateCompat.ACTION_PAUSE)
-            .setState(PlaybackStateCompat.STATE_PLAYING, 0, 1f)
-            .build()
-
-        mediaSession.setPlaybackState(state)
+        setPlaybackState(PlaybackStateCompat.STATE_PLAYING)
         mediaSession.isActive = true
         sessionToken = mediaSession.sessionToken
 
         mediaPlayer = MediaPlayer.create(this, R.raw.silent)
         mediaPlayer?.isLooping = true
         mediaPlayer?.start()
+    }
+
+    private fun setPlaybackState(state: Int) {
+        val playbackState = PlaybackStateCompat.Builder()
+            .setActions(
+                PlaybackStateCompat.ACTION_PLAY or
+                        PlaybackStateCompat.ACTION_PAUSE or
+                        PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
+                        PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
+                        PlaybackStateCompat.ACTION_STOP
+            )
+            .setState(state, 0, 1f)
+            .build()
+        mediaSession.setPlaybackState(playbackState)
+    }
+
+    private fun sendCommandToWebView(command: String) {
+        val intent = Intent("br.zx9.krpqw.aabbcc.MEDIA_COMMAND")
+        intent.putExtra("command", command)
+        sendBroadcast(intent)
     }
 
     override fun onGetRoot(

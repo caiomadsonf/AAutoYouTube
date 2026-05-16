@@ -6,6 +6,6 @@ import androidx.car.app.Session
 class CarSession : Session() {
 
     override fun onCreateScreen(intent: android.content.Intent): Screen {
-        return PlaylistScreen(carContext)
+        return NowPlayingScreen(carContext)
     }
 }
