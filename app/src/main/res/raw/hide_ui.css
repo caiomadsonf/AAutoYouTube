@@ -1,0 +1,12 @@
+ytm-app-layout-root > header,
+.mobile-topbar-header,
+ytm-pivot-bar-renderer,
+.pivot-bar-container,
+ytm-bottom-sheet-container,
+.ytm-bottom-sheet,
+#player-control-overlay .ytp-chrome-top,
+.ytp-watermark,
+.ytp-youtube-button,
+.branding-img { display: none !important; }
+
+body { background: #000 !important; }

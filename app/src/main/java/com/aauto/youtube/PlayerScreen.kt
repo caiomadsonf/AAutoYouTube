@@ -1,5 +1,6 @@
 package com.aauto.youtube
 
+import android.content.Intent
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
 import androidx.car.app.model.Action
@@ -9,18 +10,15 @@ import androidx.car.app.model.Template
 class PlayerScreen(carContext: CarContext) : Screen(carContext) {
 
     override fun onGetTemplate(): Template {
-        return MessageTemplate.Builder("Abrindo YouTube...")
+        return MessageTemplate.Builder("Toque em Abrir para assistir YouTube no seu carro!")
             .setTitle("AAuto YouTube")
             .addAction(
                 Action.Builder()
                     .setTitle("Abrir YouTube")
                     .setOnClickListener {
-                        carContext.startCarApp(
-                            android.content.Intent(
-                                android.content.Intent.ACTION_VIEW,
-                                android.net.Uri.parse("https://m.youtube.com")
-                            )
-                        )
+                        val intent = Intent(carContext, WebViewActivity::class.java)
+                        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        carContext.startActivity(intent)
                     }
                     .build()
             )
