@@ -42,12 +42,14 @@ class WebViewActivity : Activity() {
             cacheMode = WebSettings.LOAD_DEFAULT
             allowContentAccess = true
             allowFileAccess = true
+            loadWithOverviewMode = true
+            useWideViewPort = true
         }
 
         webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView, url: String) {
                 injectCSS()
-                injectJS()
+                injectAllJS()
             }
 
             override fun shouldOverrideUrlLoading(
@@ -74,9 +76,16 @@ class WebViewActivity : Activity() {
         webView.evaluateJavascript(js, null)
     }
 
-    private fun injectJS() {
-        val js = readRawFile(R.raw.remove_ads)
-        webView.evaluateJavascript(js, null)
+    private fun injectAllJS() {
+        listOf(
+            R.raw.remove_ads,
+            R.raw.touchless_click,
+            R.raw.intercept_clicks,
+            R.raw.autoplay,
+            R.raw.fullscreen
+        ).forEach { resId ->
+            webView.evaluateJavascript(readRawFile(resId), null)
+        }
     }
 
     private fun readRawFile(resId: Int): String {
