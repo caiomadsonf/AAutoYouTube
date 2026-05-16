@@ -2,7 +2,9 @@ package com.aauto.youtube
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.Intent
 import android.os.Bundle
+import android.webkit.CookieManager
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
@@ -16,8 +18,22 @@ class WebViewActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // verifica se já está logado
+        val prefs = getSharedPreferences("aauto", MODE_PRIVATE)
+        val loggedIn = prefs.getBoolean("logged_in", false)
+
+        if (!loggedIn) {
+            startActivity(Intent(this, LoginActivity::class.java))
+            finish()
+            return
+        }
+
         webView = WebView(this)
         setContentView(webView)
+
+        val cookieManager = CookieManager.getInstance()
+        cookieManager.setAcceptCookie(true)
+        cookieManager.setAcceptThirdPartyCookies(webView, true)
 
         webView.settings.apply {
             javaScriptEnabled = true
@@ -35,7 +51,10 @@ class WebViewActivity : Activity() {
                 injectJS()
             }
 
-            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+            override fun shouldOverrideUrlLoading(
+                view: WebView,
+                request: WebResourceRequest
+            ): Boolean {
                 view.loadUrl(request.url.toString())
                 return true
             }

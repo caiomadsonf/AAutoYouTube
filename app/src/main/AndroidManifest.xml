@@ -33,6 +33,10 @@
             android:exported="true"
             android:launchMode="singleTask" />
 
+        <activity
+            android:name=".LoginActivity"
+            android:exported="false" />
+
         <service
             android:name=".CarService"
             android:exported="true">
