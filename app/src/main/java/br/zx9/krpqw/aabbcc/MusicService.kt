@@ -21,15 +21,16 @@ import androidx.media.session.MediaButtonReceiver
 class MusicService : MediaBrowserServiceCompat() {
 
     private lateinit var mediaSession: MediaSessionCompat
+
     private var playerStateReceiver: BroadcastReceiver? = null
     private var playerProgressReceiver: BroadcastReceiver? = null
     private var videoEndedReceiver: BroadcastReceiver? = null
 
-    // Estado atual rastreado — evita notificações desnecessárias
     private var currentState = PlaybackStateCompat.STATE_PAUSED
     private var currentPosition = 0L
     private var currentDuration = 0L
     private var currentTitle = "AAuto YouTube"
+    private var currentArtist = "YouTube"
 
     companion object {
         private const val ROOT_ID = "root"
@@ -45,82 +46,102 @@ class MusicService : MediaBrowserServiceCompat() {
         setupMediaSession()
         setupStateReceivers()
 
+        setInitialMetadata()
         setPlaybackState(PlaybackStateCompat.STATE_PAUSED, 0L)
         setSessionToken(mediaSession.sessionToken)
         startForegroundWithNotification()
     }
 
-    // ── MediaSession ──────────────────────────────────────────────────────────
-
     private fun setupMediaSession() {
         mediaSession = MediaSessionCompat(this, "AAutoYouTube").apply {
-            setCallback(object : MediaSessionCompat.Callback() {
-
-                override fun onPlay() {
-                    sendCommandToWebView("play")
-                    // Estado será atualizado via PLAYER_STATE broadcast — não aqui.
-                    // Isso garante que a MediaSession reflita o estado REAL do player.
-                }
-
-                override fun onPause() {
-                    sendCommandToWebView("pause")
-                }
-
-                override fun onSkipToNext() {
-                    sendCommandToWebView("next")
-                }
-
-                override fun onSkipToPrevious() {
-                    sendCommandToWebView("previous")
-                }
-
-                override fun onStop() {
-                    sendCommandToWebView("stop")
-                    setPlaybackState(PlaybackStateCompat.STATE_STOPPED, 0L)
-                    stopForeground(true)
-                    stopSelf()
-                }
-
-                override fun onSeekTo(pos: Long) {
-                    val intent = Intent("br.zx9.krpqw.aabbcc.MEDIA_COMMAND").apply {
-                        setPackage(packageName)
-                        putExtra("command", "seekTo")
-                        putExtra("position", pos)
+            setCallback(
+                object : MediaSessionCompat.Callback() {
+                    override fun onPlay() {
+                        launchWebViewIfNeeded()
+                        sendCommandToWebView("play")
+                        currentState = PlaybackStateCompat.STATE_PLAYING
+                        setPlaybackState(PlaybackStateCompat.STATE_PLAYING, currentPosition)
+                        updateNotification()
                     }
-                    sendBroadcast(intent)
-                }
 
-                override fun onPlayFromMediaId(mediaId: String?, extras: Bundle?) {
-                    if (mediaId == MEDIA_ID_YOUTUBE) {
-                        launchWebView()
+                    override fun onPause() {
+                        sendCommandToWebView("pause")
+                        currentState = PlaybackStateCompat.STATE_PAUSED
+                        setPlaybackState(PlaybackStateCompat.STATE_PAUSED, currentPosition)
+                        updateNotification()
+                    }
+
+                    override fun onSkipToNext() {
+                        launchWebViewIfNeeded()
+                        sendCommandToWebView("next")
+                    }
+
+                    override fun onSkipToPrevious() {
+                        launchWebViewIfNeeded()
+                        sendCommandToWebView("previous")
+                    }
+
+                    override fun onStop() {
+                        sendCommandToWebView("stop")
+                        currentState = PlaybackStateCompat.STATE_STOPPED
+                        setPlaybackState(PlaybackStateCompat.STATE_STOPPED, 0L)
+                        stopForeground(true)
+                        stopSelf()
+                    }
+
+                    override fun onSeekTo(pos: Long) {
+                        val intent = Intent("br.zx9.krpqw.aabbcc.MEDIA_COMMAND").apply {
+                            setPackage(packageName)
+                            putExtra("command", "seekTo")
+                            putExtra("position", pos)
+                        }
+                        sendBroadcast(intent)
+                        currentPosition = pos
+                        setPlaybackState(currentState, currentPosition)
+                    }
+
+                    override fun onPlayFromMediaId(mediaId: String?, extras: Bundle?) {
+                        if (mediaId == MEDIA_ID_YOUTUBE || mediaId == null) {
+                            launchWebViewIfNeeded()
+                            sendCommandToWebView("play")
+                            currentState = PlaybackStateCompat.STATE_PLAYING
+                            setPlaybackState(PlaybackStateCompat.STATE_PLAYING, currentPosition)
+                            updateNotification()
+                        }
+                    }
+
+                    override fun onPrepare() {
+                        setInitialMetadata()
+                        setPlaybackState(PlaybackStateCompat.STATE_PAUSED, currentPosition)
+                    }
+
+                    override fun onPrepareFromMediaId(mediaId: String?, extras: Bundle?) {
+                        setInitialMetadata()
+                        setPlaybackState(PlaybackStateCompat.STATE_PAUSED, currentPosition)
                     }
                 }
-            })
+            )
 
             setFlags(
                 MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS or
-                        MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS
+                    MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS
             )
+
             isActive = true
         }
     }
 
-    // ── Receivers — estado real vindo do WebViewActivity ─────────────────────
-    // Esta é a grande diferença: em vez de o serviço adivinhar o estado,
-    // ele escuta o que o player HTML reportou via AndroidInterface.
-
     private fun setupStateReceivers() {
-        // Estado de reprodução: playing, paused, ended, buffering...
         playerStateReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
                 val state = intent.getStringExtra("state") ?: return
                 val playbackState = when (state) {
-                    "playing"   -> PlaybackStateCompat.STATE_PLAYING
-                    "paused"    -> PlaybackStateCompat.STATE_PAUSED
+                    "playing" -> PlaybackStateCompat.STATE_PLAYING
+                    "paused" -> PlaybackStateCompat.STATE_PAUSED
                     "buffering" -> PlaybackStateCompat.STATE_BUFFERING
-                    "ended"     -> PlaybackStateCompat.STATE_PAUSED
-                    "stopped"   -> PlaybackStateCompat.STATE_STOPPED
-                    else        -> return
+                    "ended" -> PlaybackStateCompat.STATE_PAUSED
+                    "stopped" -> PlaybackStateCompat.STATE_STOPPED
+                    else -> return
                 }
                 currentState = playbackState
                 setPlaybackState(playbackState, currentPosition)
@@ -133,42 +154,44 @@ class MusicService : MediaBrowserServiceCompat() {
                 }
             }
         }
+
         registerReceiver(
             playerStateReceiver,
             IntentFilter("br.zx9.krpqw.aabbcc.PLAYER_STATE"),
             RECEIVER_NOT_EXPORTED
         )
 
-        // Progresso: posição + duração em ms + título do vídeo
         playerProgressReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
                 currentPosition = intent.getLongExtra("position", 0L)
                 currentDuration = intent.getLongExtra("duration", 0L)
-                val title = intent.getStringExtra("title") ?: ""
 
-                // Atualiza metadados se o título mudou (novo vídeo)
+                val title = intent.getStringExtra("title") ?: ""
                 if (title.isNotEmpty() && title != currentTitle) {
                     currentTitle = title
-                    updateMetadata(title)
+                    currentArtist = "YouTube"
                 }
 
-                // Atualiza posição na MediaSession (barra de progresso no Android Auto)
+                updateMetadata(currentTitle, currentArtist, currentDuration)
                 setPlaybackState(currentState, currentPosition)
             }
         }
+
         registerReceiver(
             playerProgressReceiver,
             IntentFilter("br.zx9.krpqw.aabbcc.PLAYER_PROGRESS"),
             RECEIVER_NOT_EXPORTED
         )
 
-        // Vídeo terminou — poderia iniciar autoplay aqui no futuro
         videoEndedReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
                 currentPosition = 0L
+                currentState = PlaybackStateCompat.STATE_PAUSED
                 setPlaybackState(PlaybackStateCompat.STATE_PAUSED, 0L)
+                updateNotification()
             }
         }
+
         registerReceiver(
             videoEndedReceiver,
             IntentFilter("br.zx9.krpqw.aabbcc.VIDEO_ENDED"),
@@ -176,57 +199,70 @@ class MusicService : MediaBrowserServiceCompat() {
         )
     }
 
-    // ── MediaBrowser ──────────────────────────────────────────────────────────
+    override fun onGetRoot(clientPackageName: String, clientUid: Int, rootHints: Bundle?): BrowserRoot {
+        return BrowserRoot(ROOT_ID, null)
+    }
 
-    override fun onGetRoot(
-        clientPackageName: String,
-        clientUid: Int,
-        rootHints: Bundle?
-    ): BrowserRoot = BrowserRoot(ROOT_ID, null)
-
-    override fun onLoadChildren(
-        parentId: String,
-        result: Result<List<MediaBrowserCompat.MediaItem>>
-    ) {
-        if (parentId != ROOT_ID) { result.sendResult(emptyList()); return }
+    override fun onLoadChildren(parentId: String, result: Result<List<MediaBrowserCompat.MediaItem>>) {
+        if (parentId != ROOT_ID) {
+            result.sendResult(emptyList())
+            return
+        }
 
         val description = MediaDescriptionCompat.Builder()
             .setMediaId(MEDIA_ID_YOUTUBE)
             .setTitle("AAuto YouTube")
             .setSubtitle("Reproduzir YouTube")
+            .setDescription("Abrir player de video")
             .build()
 
-        result.sendResult(listOf(
-            MediaBrowserCompat.MediaItem(description, MediaBrowserCompat.MediaItem.FLAG_PLAYABLE)
-        ))
+        result.sendResult(
+            listOf(MediaBrowserCompat.MediaItem(description, MediaBrowserCompat.MediaItem.FLAG_PLAYABLE))
+        )
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    private fun setPlaybackState(state: Int, position: Long) {
-        val pb = PlaybackStateCompat.Builder()
-            .setActions(
-                PlaybackStateCompat.ACTION_PLAY or
-                        PlaybackStateCompat.ACTION_PAUSE or
-                        PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
-                        PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
-                        PlaybackStateCompat.ACTION_STOP or
-                        PlaybackStateCompat.ACTION_SEEK_TO or
-                        PlaybackStateCompat.ACTION_PLAY_FROM_MEDIA_ID
-            )
-            .setState(state, position, if (state == PlaybackStateCompat.STATE_PLAYING) 1f else 0f)
-            .build()
-        mediaSession.setPlaybackState(pb)
+    private fun setInitialMetadata() {
+        currentTitle = "AAuto YouTube"
+        currentArtist = "YouTube"
+        currentDuration = 0L
+        updateMetadata(currentTitle, currentArtist, currentDuration)
     }
 
-    private fun updateMetadata(title: String) {
+    private fun updateMetadata(title: String, artist: String, duration: Long) {
         val metadata = MediaMetadataCompat.Builder()
+            .putString(MediaMetadataCompat.METADATA_KEY_MEDIA_ID, MEDIA_ID_YOUTUBE)
             .putString(MediaMetadataCompat.METADATA_KEY_TITLE, title)
-            .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, "YouTube")
-            .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, currentDuration)
+            .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_TITLE, title)
+            .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, artist)
+            .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE, artist)
+            .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, "AAuto YouTube")
+            .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, duration)
             .build()
+
         mediaSession.setMetadata(metadata)
         updateNotification()
+    }
+
+    private fun setPlaybackState(state: Int, position: Long) {
+        val actions =
+            PlaybackStateCompat.ACTION_PLAY or
+                PlaybackStateCompat.ACTION_PAUSE or
+                PlaybackStateCompat.ACTION_PLAY_PAUSE or
+                PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
+                PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
+                PlaybackStateCompat.ACTION_STOP or
+                PlaybackStateCompat.ACTION_SEEK_TO or
+                PlaybackStateCompat.ACTION_PLAY_FROM_MEDIA_ID or
+                PlaybackStateCompat.ACTION_PREPARE or
+                PlaybackStateCompat.ACTION_PREPARE_FROM_MEDIA_ID
+
+        val playbackState = PlaybackStateCompat.Builder()
+            .setActions(actions)
+            .setActiveQueueItemId(0L)
+            .setState(state, position, if (state == PlaybackStateCompat.STATE_PLAYING) 1f else 0f)
+            .build()
+
+        mediaSession.setPlaybackState(playbackState)
     }
 
     private fun sendCommandToWebView(command: String) {
@@ -237,69 +273,78 @@ class MusicService : MediaBrowserServiceCompat() {
         sendBroadcast(intent)
     }
 
-    private fun launchWebView() {
-        startActivity(Intent(this, WebViewActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        })
+    private fun launchWebViewIfNeeded() {
+        startActivity(Intent(this, CarVideoActivity::class.java).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) })
     }
-
-    // ── Notificação ───────────────────────────────────────────────────────────
 
     private fun createNotificationChannel() {
         val channel = NotificationChannel(
-            CHANNEL_ID, "AAuto YouTube — mídia",
+            CHANNEL_ID,
+            "AAuto YouTube - midia",
             NotificationManager.IMPORTANCE_LOW
-        ).apply { description = "Controles de reprodução no Android Auto" }
+        ).apply { description = "Controles de reproducao no Android Auto" }
+
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
 
     private fun buildNotification(): Notification {
         val contentIntent = PendingIntent.getActivity(
-            this, 0, Intent(this, WebViewActivity::class.java), PendingIntent.FLAG_IMMUTABLE
+            this,
+            0,
+            Intent(this, CarVideoActivity::class.java),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
+
         val isPlaying = currentState == PlaybackStateCompat.STATE_PLAYING
+
+        val previousIntent = MediaButtonReceiver.buildMediaButtonPendingIntent(this, PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS)
+        val playPauseIntent = MediaButtonReceiver.buildMediaButtonPendingIntent(
+            this,
+            if (isPlaying) PlaybackStateCompat.ACTION_PAUSE else PlaybackStateCompat.ACTION_PLAY
+        )
+        val nextIntent = MediaButtonReceiver.buildMediaButtonPendingIntent(this, PlaybackStateCompat.ACTION_SKIP_TO_NEXT)
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(currentTitle)
             .setContentText(if (isPlaying) "Reproduzindo" else "Pausado")
             .setContentIntent(contentIntent)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setSilent(true)
+            .setOngoing(isPlaying)
+            .addAction(android.R.drawable.ic_media_previous, "Anterior", previousIntent)
+            .addAction(
+                if (isPlaying) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play,
+                if (isPlaying) "Pausar" else "Reproduzir",
+                playPauseIntent
+            )
+            .addAction(android.R.drawable.ic_media_next, "Proximo", nextIntent)
             .setStyle(
                 androidx.media.app.NotificationCompat.MediaStyle()
                     .setMediaSession(mediaSession.sessionToken)
                     .setShowActionsInCompactView(0, 1, 2)
             )
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setSilent(true)
-            .addAction(android.R.drawable.ic_media_previous, "Anterior",
-                MediaButtonReceiver.buildMediaButtonPendingIntent(this, PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS))
-            .addAction(
-                if (isPlaying) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play,
-                if (isPlaying) "Pausar" else "Reproduzir",
-                MediaButtonReceiver.buildMediaButtonPendingIntent(this,
-                    if (isPlaying) PlaybackStateCompat.ACTION_PAUSE else PlaybackStateCompat.ACTION_PLAY)
-            )
-            .addAction(android.R.drawable.ic_media_next, "Próximo",
-                MediaButtonReceiver.buildMediaButtonPendingIntent(this, PlaybackStateCompat.ACTION_SKIP_TO_NEXT))
             .build()
     }
 
-    private fun startForegroundWithNotification() =
+    private fun startForegroundWithNotification() {
         startForeground(NOTIFICATION_ID, buildNotification())
+    }
 
-    private fun updateNotification() =
+    private fun updateNotification() {
         getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification())
-
-    // ── Cleanup ───────────────────────────────────────────────────────────────
+    }
 
     override fun onDestroy() {
-        playerStateReceiver?.let { unregisterReceiver(it) }
-        playerProgressReceiver?.let { unregisterReceiver(it) }
-        videoEndedReceiver?.let { unregisterReceiver(it) }
+        playerStateReceiver?.let { runCatching { unregisterReceiver(it) } }
+        playerProgressReceiver?.let { runCatching { unregisterReceiver(it) } }
+        videoEndedReceiver?.let { runCatching { unregisterReceiver(it) } }
+
         if (::mediaSession.isInitialized) {
             mediaSession.isActive = false
             mediaSession.release()
         }
+
         super.onDestroy()
     }
 }
