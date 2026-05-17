@@ -8,6 +8,7 @@
 
     <application
         android:allowBackup="true"
+        android:hardwareAccelerated="true"
         android:icon="@mipmap/ic_launcher"
         android:label="AAuto YouTube"
         android:roundIcon="@mipmap/ic_launcher_round"
@@ -30,12 +31,30 @@
 
         <activity
             android:name=".WebViewActivity"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
             android:exported="false"
-            android:launchMode="singleTask" />
+            android:hardwareAccelerated="true"
+            android:launchMode="singleTask"
+            android:screenOrientation="landscape" />
+
+        <activity
+            android:name=".CarVideoActivity"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
+            android:exported="true"
+            android:hardwareAccelerated="true"
+            android:launchMode="singleTask"
+            android:screenOrientation="landscape"
+            android:theme="@style/Theme.AAutoYouTube">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.CAR_LAUNCHER" />
+            </intent-filter>
+        </activity>
 
         <activity
             android:name=".LoginActivity"
-            android:exported="false" />
+            android:exported="false"
+            android:hardwareAccelerated="true" />
 
         <activity
             android:name=".ShareFromYouTubeActivity"
@@ -54,7 +73,11 @@
             <intent-filter>
                 <action android:name="android.media.browse.MediaBrowserService" />
             </intent-filter>
-            <!-- Metadado obrigatorio para o Android Automotive reconhecer como media app -->
+
+            <meta-data
+                android:name="android.media.browse.MediaBrowserService"
+                android:value="true" />
+
             <meta-data
                 android:name="android.media.browse.MediaBrowserService.OPT_IN"
                 android:value="true" />
@@ -65,7 +88,7 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="androidx.car.app.CarAppService" />
-                <category android:name="androidx.car.app.category.MEDIA" />
+                <category android:name="androidx.car.app.category.POI" />
             </intent-filter>
         </service>
 
