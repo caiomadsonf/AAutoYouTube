@@ -13,7 +13,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.AAutoYouTube"
-        android:usesCleartextTraffic="true">
+        android:usesCleartextTraffic="false">
 
         <meta-data
             android:name="com.google.android.gms.car.application"
@@ -30,7 +30,7 @@
 
         <activity
             android:name=".WebViewActivity"
-            android:exported="true"
+            android:exported="false"
             android:launchMode="singleTask" />
 
         <activity
@@ -54,7 +54,28 @@
             <intent-filter>
                 <action android:name="android.media.browse.MediaBrowserService" />
             </intent-filter>
+            <!-- Metadado obrigatorio para o Android Automotive reconhecer como media app -->
+            <meta-data
+                android:name="android.media.browse.MediaBrowserService.OPT_IN"
+                android:value="true" />
         </service>
+
+        <service
+            android:name=".CarService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="androidx.car.app.CarAppService" />
+                <category android:name="androidx.car.app.category.MEDIA" />
+            </intent-filter>
+        </service>
+
+        <receiver
+            android:name="androidx.media.session.MediaButtonReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
+            </intent-filter>
+        </receiver>
 
     </application>
 

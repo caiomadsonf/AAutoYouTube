@@ -1,17 +1,65 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { background: #000; width: 100%; height: 100vh; overflow: hidden; }
-iframe { width: 100%; height: 100%; border: none; }
-</style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { background: #000; width: 100%; height: 100vh; overflow: hidden; }
+        iframe { width: 100%; height: 100%; border: none; display: block; }
+    </style>
 </head>
 <body>
-<iframe src="https://m.youtube.com" 
-  allow="autoplay; fullscreen"
-  allowfullscreen>
+<iframe
+        id="yt"
+        src="https://www.youtube.com/tv#/watch?v=jNQXAC9IVRw"
+        allow="autoplay; fullscreen; encrypted-media"
+        allowfullscreen>
 </iframe>
+
+<script>
+    var iframe = document.getElementById('yt');
+
+    // Recebe comandos do Android via evaluateJavascript
+    function handleCommand(commandJson) {
+        try {
+            var cmd = typeof commandJson === 'string' ? JSON.parse(commandJson) : commandJson;
+
+            switch (cmd.action) {
+                case 'loadVideo':
+                    var vid = cmd.videoId;
+                    var list = cmd.playlistId;
+                    if (list) {
+                        iframe.src = 'https://www.youtube.com/tv#/watch?v=' + vid + '&list=' + list;
+                    } else if (vid) {
+                        iframe.src = 'https://www.youtube.com/tv#/watch?v=' + vid;
+                    }
+                    break;
+                case 'browse':
+                    iframe.src = 'https://www.youtube.com/tv#/browse';
+                    break;
+                case 'play':
+                    iframe.contentWindow.postMessage(
+                        JSON.stringify({event:'command', func:'playVideo', args:''}), '*');
+                    break;
+                case 'pause':
+                    iframe.contentWindow.postMessage(
+                        JSON.stringify({event:'command', func:'pauseVideo', args:''}), '*');
+                    break;
+            }
+        } catch(e) {}
+    }
+
+    // Notifica o Android quando o player muda de estado
+    window.addEventListener('message', function(e) {
+        try {
+            var data = JSON.parse(e.data);
+            if (window.AndroidInterface && data.event === 'onStateChange') {
+                var states = {'-1':'unstarted','0':'ended','1':'playing','2':'paused','3':'buffering'};
+                window.AndroidInterface.onPlayerEvent(
+                    JSON.stringify({event:'stateChange', data:{state: states[data.info] || 'unknown'}}));
+            }
+        } catch(e) {}
+    });
+</script>
 </body>
 </html>
