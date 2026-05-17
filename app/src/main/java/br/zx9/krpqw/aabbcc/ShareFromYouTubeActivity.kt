@@ -14,22 +14,35 @@ class ShareFromYouTubeActivity : Activity() {
 
         if (videoUrl.isNotEmpty()) {
             val prefs = getSharedPreferences("aauto", MODE_PRIVATE)
-            prefs.edit().putString("shared_video_url", videoUrl).apply()
+            prefs.edit()
+                .putString("shared_video_url", videoUrl)
+                .putString("selected_url", videoUrl)
+                .apply()
         }
 
-        val intent = Intent(this, WebViewActivity::class.java)
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-        startActivity(intent)
+        startActivity(
+            Intent(this, CarVideoActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                if (videoUrl.isNotEmpty()) putExtra("url", videoUrl)
+            }
+        )
+
         finish()
     }
 
     private fun extractYouTubeUrl(text: String): String {
-        val regex = Regex("(https?://)?(www\\.)?(youtube\\.com|youtu\\.be)/(watch\\?v=|shorts/)?([\\w-]+)")
-        val match = regex.find(text)
-        return if (match != null) {
-            "https://m.youtube.com/watch?v=${match.groupValues[5]}"
-        } else {
-            ""
+        val patterns = listOf(
+            Regex("https?://(www\\.)?youtube\\.com/watch\\?[^\\s]*v=([a-zA-Z0-9_-]{11})"),
+            Regex("https?://youtu\\.be/([a-zA-Z0-9_-]{11})"),
+            Regex("https?://(www\\.)?youtube\\.com/shorts/([a-zA-Z0-9_-]{11})")
+        )
+
+        for (pattern in patterns) {
+            val match = pattern.find(text) ?: continue
+            val videoId = match.groupValues.lastOrNull { it.length == 11 } ?: continue
+            return "https://www.youtube.com/watch?v=$videoId"
         }
+
+        return ""
     }
 }
