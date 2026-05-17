@@ -21,19 +21,18 @@ class LoginActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Container principal
         val container = FrameLayout(this)
         setContentView(container)
 
-        // WebView de login
         webView = WebView(this)
-        container.addView(webView, FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.MATCH_PARENT
-        ))
+        container.addView(
+            webView,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        )
 
-        // ── Botão de bypass (só em debug) ────────────────────────────────────
-        // Em produção (release), BuildConfig.DEBUG é false e o botão não aparece.
         if (BuildConfig.DEBUG) {
             val skipButton = Button(this).apply {
                 text = "Pular login (debug)"
@@ -42,6 +41,7 @@ class LoginActivity : Activity() {
                 alpha = 0.85f
                 setOnClickListener { completeLogin() }
             }
+
             val params = FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
@@ -49,10 +49,10 @@ class LoginActivity : Activity() {
                 gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
                 bottomMargin = 48
             }
+
             container.addView(skipButton, params)
         }
 
-        // ── WebView de login Google ───────────────────────────────────────────
         val cookieManager = CookieManager.getInstance()
         cookieManager.setAcceptCookie(true)
         cookieManager.setAcceptThirdPartyCookies(webView, true)
@@ -60,16 +60,16 @@ class LoginActivity : Activity() {
         webView.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
-            userAgentString = "Mozilla/5.0 (Linux; Android 15; Moto G05) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+            mediaPlaybackRequiresUserGesture = false
+            userAgentString =
+                "Mozilla/5.0 (Linux; Android 15; Moto G05) " +
+                    "AppleWebKit/537.36 (KHTML, like Gecko) " +
+                    "Chrome/120.0.0.0 Mobile Safari/537.36"
         }
 
         webView.webViewClient = object : WebViewClient() {
-            override fun shouldOverrideUrlLoading(
-                view: WebView,
-                request: WebResourceRequest
-            ): Boolean {
+            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val url = request.url.toString()
-                // Detecta quando o login foi concluído e o YouTube foi aberto
                 if (url.contains("youtube.com") && !url.contains("accounts.google.com")) {
                     cookieManager.flush()
                     completeLogin()
@@ -79,7 +79,13 @@ class LoginActivity : Activity() {
             }
         }
 
-        webView.loadUrl("https://accounts.google.com/ServiceLogin?service=youtube&uilel=3&passive=true&continue=https://m.youtube.com/signin?action_handle_signin=true")
+        webView.loadUrl(
+            "https://accounts.google.com/ServiceLogin" +
+                "?service=youtube" +
+                "&uilel=3" +
+                "&passive=true" +
+                "&continue=https://m.youtube.com/signin?action_handle_signin=true"
+        )
     }
 
     private fun completeLogin() {
@@ -87,7 +93,13 @@ class LoginActivity : Activity() {
             .edit()
             .putBoolean("logged_in", true)
             .apply()
-        startActivity(Intent(this, WebViewActivity::class.java))
+
+        startActivity(
+            Intent(this, CarVideoActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+        )
+
         finish()
     }
 }
